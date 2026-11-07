@@ -2,7 +2,7 @@
 
 import logging
 import time
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Annotated
 
@@ -34,6 +34,16 @@ def _db(path: Path | None) -> tuple[Store, Settings]:
     if path is not None:
         settings.database_path = path.expanduser().absolute()
     return Store(settings.database_path), settings
+
+
+def _decimal_input(raw: str, *, max_value: Decimal | None = None) -> Decimal:
+    try:
+        value = Decimal(raw)
+    except InvalidOperation as exc:
+        raise InvalidProduct("Invalid decimal number") from exc
+    if not value.is_finite() or value <= 0 or (max_value is not None and value > max_value):
+        raise InvalidProduct("Value must be positive and within range")
+    return value
 
 
 def _fail(exc: Exception) -> None:
@@ -76,8 +86,8 @@ def add(
     name_selector: str | None = typer.Option(None, help="CSS selector for product name."),
     price_selector: str | None = typer.Option(None, help="CSS selector for price."),
     currency: str | None = typer.Option(None, help="Three-letter ISO currency."),
-    target: Decimal | None = typer.Option(None, help="Alert at or below target price."),
-    drop_percent: Decimal | None = typer.Option(None, help="Alert on per-check percentage drop."),
+    target: str | None = typer.Option(None, help="Alert at or below target price."),
+    drop_percent: str | None = typer.Option(None, help="Alert on per-check percentage drop."),
     db: DbOption = None,
 ) -> None:
     """Register a product without automatically fetching the page."""
@@ -199,17 +209,17 @@ def history(
 @app.command()
 def target(
     product_id: int = typer.Argument(..., min=1),
-    amount: Decimal = typer.Argument(..., min=0.0001),
+    amount: str = typer.Argument(...),
     db: DbOption = None,
 ) -> None:
     """Set a positive target price (same currency as the product)."""
     try:
         store, _ = _db(db)
         try:
-            store.set_alerts(product_id, target=amount)
+            store.set_alerts(product_id, target=_decimal_input(amount))
         finally:
             store.close()
-        console.print(f"Target for product #{product_id}: {amount:.2f}")
+        console.print(f"Target for product #{product_id}: {_decimal_input(amount):.2f}")
     except (TrackerError, OSError) as exc:
         _fail(exc)
 
@@ -217,14 +227,14 @@ def target(
 @app.command("drop-alert")
 def drop_alert(
     product_id: int = typer.Argument(..., min=1),
-    percent: Decimal = typer.Argument(..., min=0.001, max=100),
+    percent: str = typer.Argument(...),
     db: DbOption = None,
 ) -> None:
     """Configure percentage drop alert against the previous check."""
     try:
         store, _ = _db(db)
         try:
-            store.set_alerts(product_id, drop_percent=percent)
+            store.set_alerts(product_id, drop_percent=_decimal_input(percent, max_value=Decimal(100)))
         finally:
             store.close()
         console.print(f"Drop alert for product #{product_id}: {percent}%")

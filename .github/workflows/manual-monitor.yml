@@ -1,0 +1,52 @@
+name: Opt-in price monitoring (manual only)
+
+# No schedule trigger until explicitly approved by the owner.
+# After approval, the owner may add:
+#   schedule:
+#     - cron: "17 8 * * *"
+# Scheduled runs still require TRACKER_MONITOR_APPROVED=true.
+
+on:
+  workflow_dispatch:
+    inputs:
+      approved:
+        description: "I explicitly approve this monitoring run."
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: price-monitoring-private-state
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    if: vars.TRACKER_MONITOR_APPROVED == 'true' && (github.event_name == 'schedule' || inputs.approved == true)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+      - name: Install package
+        run: python -m pip install .
+      - name: One bounded monitoring pass against approved sources
+        env:
+          TRACKER_MONITOR_APPROVED: ${{ vars.TRACKER_MONITOR_APPROVED }}
+          TRACKER_STATE_REPO: ${{ vars.TRACKER_STATE_REPO }}
+          TRACKER_STATE_BRANCH: ${{ vars.TRACKER_STATE_BRANCH }}
+          TRACKER_ALLOWED_HOSTS: ${{ vars.TRACKER_ALLOWED_HOSTS }}
+          TRACKER_STATE_TOKEN: ${{ secrets.TRACKER_STATE_TOKEN }}
+          TRACKER_PRODUCTS_JSON: ${{ secrets.TRACKER_PRODUCTS_JSON }}
+          PRICE_TRACKER_SMTP_HOST: ${{ secrets.PRICE_TRACKER_SMTP_HOST }}
+          PRICE_TRACKER_SMTP_PORT: ${{ vars.PRICE_TRACKER_SMTP_PORT }}
+          PRICE_TRACKER_SMTP_FROM: ${{ secrets.PRICE_TRACKER_SMTP_FROM }}
+          PRICE_TRACKER_SMTP_TO: ${{ secrets.PRICE_TRACKER_SMTP_TO }}
+          PRICE_TRACKER_SMTP_USERNAME: ${{ secrets.PRICE_TRACKER_SMTP_USERNAME }}
+          PRICE_TRACKER_SMTP_PASSWORD: ${{ secrets.PRICE_TRACKER_SMTP_PASSWORD }}
+        run: python -m price_tracker.github_runner

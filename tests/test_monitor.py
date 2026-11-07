@@ -14,9 +14,8 @@ def test_price_increase_drop_and_target_dedup(store, settings) -> None:
         )
     )
     prices = iter((100, 78, 78, 85, 79, 110))
-    extractor = lambda product, settings: PriceQuote(
-        name="Widget", price=next(prices), currency="USD"
-    )
+    def extractor(product, settings):
+        return PriceQuote(name="Widget", price=next(prices), currency="USD")
     results = [check_one(store, product, settings, extractor=extractor) for _ in range(6)]
     assert results[0].change_percent is None
     assert results[1].change_percent == Decimal("-22")

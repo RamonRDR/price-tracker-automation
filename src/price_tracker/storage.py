@@ -139,9 +139,12 @@ class Store:
             product.currency = quote.currency
             session.flush()
             alerts: list[AlertEvent] = []
-            if product.target is not None and quote.price <= product.target:
-                if previous is None or previous.price > product.target:
-                    alerts.append(
+            if (
+                product.target is not None
+                and quote.price <= product.target
+                and (previous is None or previous.price > product.target)
+            ):
+                alerts.append(
                         AlertEvent(
                             product_id=product.id,
                             observation_id=observation.id,
@@ -150,7 +153,7 @@ class Store:
                             message=f"Target reached: {quote.currency} {quote.price:.2f} "
                             f"<= {product.target:.2f}",
                         )
-                    )
+                )
             if (
                 previous is not None
                 and product.drop_percent is not None

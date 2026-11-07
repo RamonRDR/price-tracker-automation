@@ -30,7 +30,7 @@ class ProductInput(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def validate_css(self) -> "ProductInput":
+    def validate_css(self) -> ProductInput:
         if self.adapter == "css" and not (
             self.name_selector and self.price_selector and self.currency
         ):

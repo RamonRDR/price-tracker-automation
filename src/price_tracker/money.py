@@ -16,6 +16,8 @@ def parse_price(raw: str | int | float | Decimal) -> Decimal:
     With a single type of separator, three trailing digits mean thousands,
     except for decimal values explicitly passed as Decimal.
     """
+    if "-" in str(raw):
+        raise PriceUnavailable("Negative prices are not allowed")
     if isinstance(raw, Decimal):
         amount = raw
     elif isinstance(raw, int):

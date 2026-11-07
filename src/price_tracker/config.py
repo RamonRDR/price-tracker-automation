@@ -22,7 +22,7 @@ class Settings(BaseModel):
         return value.expanduser().absolute()
 
     @classmethod
-    def from_env(cls) -> "Settings":
+    def from_env(cls) -> Settings:
         return cls(
             database_path=os.environ.get(
                 "PRICE_TRACKER_DB", str(Path.home() / ".local/share/price-tracker/prices.db")

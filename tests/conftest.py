@@ -35,6 +35,11 @@ def local_pages() -> Iterator[str]:
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:  # noqa: N802
+            if self.path == "/redirect":
+                self.send_response(302)
+                self.send_header("Location", "/product")
+                self.end_headers()
+                return
             if self.path == "/unavailable":
                 self.send_response(503)
                 self.end_headers()

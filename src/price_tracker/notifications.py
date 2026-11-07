@@ -23,7 +23,7 @@ def send_email(events: list[AlertEvent]) -> None:
         return
     username = os.getenv("PRICE_TRACKER_SMTP_USERNAME", "")
     password = os.getenv("PRICE_TRACKER_SMTP_PASSWORD", "")
-    port = int(os.getenv("PRICE_TRACKER_SMTP_PORT", "587"))
+    port = int(os.getenv("PRICE_TRACKER_SMTP_PORT") or "587")
     if not (1 <= port <= 65535):
         raise ValueError("SMTP port out of range")
     message = EmailMessage()

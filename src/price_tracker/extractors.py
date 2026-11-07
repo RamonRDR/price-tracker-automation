@@ -2,6 +2,7 @@
 
 import json
 import logging
+from urllib.parse import urlparse
 from datetime import UTC, datetime
 from html.parser import HTMLParser
 from typing import Any
@@ -108,11 +109,13 @@ def fetch_jsonld(product: Product, settings: Settings) -> PriceQuote:
     try:
         with httpx.Client(
             timeout=settings.timeout_seconds,
-            follow_redirects=True,
+            follow_redirects=False,
             max_redirects=3,
             headers={"User-Agent": "PriceTrackerAutomation/0.1 (responsible monitoring)"},
         ) as client:
             response = client.get(product.url)
+            if response.status_code in (401, 403, 429):
+                raise PriceUnavailable("Source denied automated access")
             response.raise_for_status()
             if "html" not in response.headers.get("content-type", "").lower():
                 raise PriceUnavailable("Source did not return HTML")
@@ -134,8 +137,12 @@ def fetch_css(product: Product, settings: Settings) -> PriceQuote:
                     wait_until="domcontentloaded",
                     timeout=int(settings.timeout_seconds * 1000),
                 )
+                if response and response.status in (401, 403, 429):
+                    raise PriceUnavailable("Source denied automated access")
                 if response and response.status >= 400:
                     raise SourceError(f"Browser returned HTTP {response.status}")
+                if urlparse(page.url).hostname != urlparse(product.url).hostname:
+                    raise SourceError("Cross-host redirects are not followed")
                 name = (
                     page.locator(product.name_selector)
                     .first.inner_text(timeout=int(settings.timeout_seconds * 1000))

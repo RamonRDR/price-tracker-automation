@@ -1,6 +1,7 @@
 """Bounded monitoring orchestration with persisted price comparisons."""
 
 import logging
+import smtplib
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -83,7 +84,7 @@ def check_one(
     if notify and alerts:
         try:
             send_email(alerts)
-        except (OSError, ValueError, ConnectionError) as exc:
+        except (OSError, ValueError, smtplib.SMTPException) as exc:
             logger.error(
                 "Email delivery failed for product_id=%s: %s", product.id, type(exc).__name__
             )

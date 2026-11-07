@@ -2,7 +2,7 @@
 
 import pytest
 
-from price_tracker.errors import PriceUnavailable, SourceError
+from price_tracker.errors import SourceError
 from price_tracker.extractors import fetch_jsonld
 from price_tracker.schemas import ProductInput
 

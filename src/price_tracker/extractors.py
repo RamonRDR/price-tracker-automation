@@ -2,10 +2,10 @@
 
 import json
 import logging
-from urllib.parse import urlparse
 from datetime import UTC, datetime
 from html.parser import HTMLParser
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 from playwright.sync_api import Error as PlaywrightError

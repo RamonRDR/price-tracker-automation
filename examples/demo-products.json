@@ -1,0 +1,17 @@
+[
+  {
+    "url": "https://demo.example.org/widget",
+    "adapter": "jsonld",
+    "target": "80.00",
+    "drop_percent": "10"
+  },
+  {
+    "url": "https://demo.example.org/catalog/widget",
+    "adapter": "css",
+    "name_selector": "h1.product-name",
+    "price_selector": ".current-price",
+    "currency": "USD",
+    "target": "49.00",
+    "drop_percent": "15"
+  }
+]

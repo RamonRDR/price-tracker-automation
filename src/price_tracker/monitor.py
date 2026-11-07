@@ -110,8 +110,6 @@ def check_many(
         if index:
             sleep(settings.between_products_seconds)
         results.append(
-            check_one(
-                store, product, settings, extractor=extractor, notify=notify, sleep=sleep
-            )
+            check_one(store, product, settings, extractor=extractor, notify=notify, sleep=sleep)
         )
     return results

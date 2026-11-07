@@ -7,7 +7,6 @@ from price_tracker.cli import app
 from price_tracker.exporter import export_csv
 from price_tracker.schemas import PriceQuote, ProductInput
 
-
 runner = CliRunner()
 
 
@@ -30,9 +29,7 @@ def test_cli_registration_list_target_pause_resume_and_export(tmp_path) -> None:
 
 
 def test_cli_invalid_product_url(tmp_path) -> None:
-    result = runner.invoke(
-        app, ["add", "javascript:alert(1)", "--db", str(tmp_path / "prices.db")]
-    )
+    result = runner.invoke(app, ["add", "javascript:alert(1)", "--db", str(tmp_path / "prices.db")])
     assert result.exit_code == 2
 
 

@@ -38,7 +38,9 @@ def test_history_order_and_currency_safety(store: Store) -> None:
     for value in (Decimal("20"), Decimal("18"), Decimal("21")):
         store.save_check(product.id, PriceQuote(name="Sample", price=value, currency="USD"))
     assert [row.price for row in store.history(product.id)] == [
-        Decimal("21"), Decimal("18"), Decimal("20")
+        Decimal("21"),
+        Decimal("18"),
+        Decimal("20"),
     ]
     with pytest.raises(InvalidProduct, match="Currency changed"):
         store.save_check(

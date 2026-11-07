@@ -14,8 +14,10 @@ def test_price_increase_drop_and_target_dedup(store, settings) -> None:
         )
     )
     prices = iter((100, 78, 78, 85, 79, 110))
+
     def extractor(product, settings):
         return PriceQuote(name="Widget", price=next(prices), currency="USD")
+
     results = [check_one(store, product, settings, extractor=extractor) for _ in range(6)]
     assert results[0].change_percent is None
     assert results[1].change_percent == Decimal("-22")
@@ -74,7 +76,8 @@ def test_multiple_products_and_pause(store, settings) -> None:
     two = store.add(ProductInput(url="https://example.test/two"))
     store.set_active(two.id, active=False)
     results = check_many(
-        store, settings,
+        store,
+        settings,
         extractor=lambda product, _: PriceQuote(
             name=f"Product {product.id}", price=Decimal("10"), currency="USD"
         ),

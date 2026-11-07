@@ -75,7 +75,9 @@ def _render_results(results: list[CheckResult]) -> None:
 
 
 @app.callback()
-def main(verbose: bool = typer.Option(False, "--verbose", help="Enable diagnostic JSON logs.")) -> None:
+def main(
+    verbose: bool = typer.Option(False, "--verbose", help="Enable diagnostic JSON logs."),
+) -> None:
     setup_logging(logging.DEBUG if verbose else logging.WARNING)
 
 
@@ -125,7 +127,10 @@ def products(db: DbOption = None) -> None:
             table.add_column(column)
         for item in rows:
             table.add_row(
-                str(item.id), item.name, item.adapter, item.currency or "-",
+                str(item.id),
+                item.name,
+                item.adapter,
+                item.currency or "-",
                 str(item.target) if item.target is not None else "-",
                 str(item.drop_percent) if item.drop_percent is not None else "-",
                 "yes" if item.active else "no",
@@ -234,7 +239,9 @@ def drop_alert(
     try:
         store, _ = _db(db)
         try:
-            store.set_alerts(product_id, drop_percent=_decimal_input(percent, max_value=Decimal(100)))
+            store.set_alerts(
+                product_id, drop_percent=_decimal_input(percent, max_value=Decimal(100))
+            )
         finally:
             store.close()
         console.print(f"Drop alert for product #{product_id}: {percent}%")
@@ -290,7 +297,10 @@ def show_alerts(
             table.add_column(label)
         for row in rows:
             table.add_row(
-                str(row.id), str(row.product_id), row.kind, row.message,
+                str(row.id),
+                str(row.product_id),
+                row.kind,
+                row.message,
                 row.created_at.isoformat(),
             )
         console.print(table)

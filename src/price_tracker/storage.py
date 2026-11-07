@@ -97,9 +97,11 @@ class Store:
 
     def history(self, product_id: int | None = None, *, limit: int = 100) -> list[PriceObservation]:
         with self.session() as session:
-            query = select(PriceObservation).order_by(
-                PriceObservation.checked_at.desc(), PriceObservation.id.desc()
-            ).limit(limit)
+            query = (
+                select(PriceObservation)
+                .order_by(PriceObservation.checked_at.desc(), PriceObservation.id.desc())
+                .limit(limit)
+            )
             if product_id is not None:
                 query = query.where(PriceObservation.product_id == product_id)
             return list(session.scalars(query))
@@ -145,21 +147,20 @@ class Store:
                 and (previous is None or previous.price > product.target)
             ):
                 alerts.append(
-                        AlertEvent(
-                            product_id=product.id,
-                            observation_id=observation.id,
-                            kind="target",
-                            dedupe_key=f"{product.id}:target:{observation.id}",
-                            message=f"Target reached: {quote.currency} {quote.price:.2f} "
-                            f"<= {product.target:.2f}",
-                        )
+                    AlertEvent(
+                        product_id=product.id,
+                        observation_id=observation.id,
+                        kind="target",
+                        dedupe_key=f"{product.id}:target:{observation.id}",
+                        message=f"Target reached: {quote.currency} {quote.price:.2f} "
+                        f"<= {product.target:.2f}",
+                    )
                 )
             if (
                 previous is not None
                 and product.drop_percent is not None
                 and previous.price > quote.price
-                and ((previous.price - quote.price) / previous.price * 100)
-                >= product.drop_percent
+                and ((previous.price - quote.price) / previous.price * 100) >= product.drop_percent
             ):
                 drop = (previous.price - quote.price) / previous.price * 100
                 alerts.append(

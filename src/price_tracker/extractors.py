@@ -28,7 +28,11 @@ class _StructuredDataParser(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         attributes = dict(attrs)
-        if tag.lower() == "script" and (attributes.get("type") or "").lower().split(";")[0].strip() == "application/ld+json":
+        if (
+            tag.lower() == "script"
+            and (attributes.get("type") or "").lower().split(";")[0].strip()
+            == "application/ld+json"
+        ):
             self.in_jsonld = True
             self.chunks = []
 
@@ -65,7 +69,7 @@ def extract_jsonld_html(html: str, *, fallback_currency: str | None = None) -> P
     for raw in parser.documents:
         try:
             document = json.loads(raw)
-        except (TypeError, json.JSONDecodeError):
+        except TypeError, json.JSONDecodeError:
             continue
         for product in _walk_json(document):
             offers = product.get("offers")
@@ -132,9 +136,11 @@ def fetch_css(product: Product, settings: Settings) -> PriceQuote:
                 )
                 if response and response.status >= 400:
                     raise SourceError(f"Browser returned HTTP {response.status}")
-                name = page.locator(product.name_selector).first.inner_text(
-                    timeout=int(settings.timeout_seconds * 1000)
-                ).strip()
+                name = (
+                    page.locator(product.name_selector)
+                    .first.inner_text(timeout=int(settings.timeout_seconds * 1000))
+                    .strip()
+                )
                 price = page.locator(product.price_selector).first.inner_text(
                     timeout=int(settings.timeout_seconds * 1000)
                 )

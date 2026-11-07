@@ -114,7 +114,9 @@ def execute() -> int:
                 failed = sum(result.status != "ok" for result in results)
                 logger.info(
                     "Checked=%s failed=%s new_alerts=%s",
-                    len(results), failed, sum(len(result.alerts) for result in results),
+                    len(results),
+                    failed,
+                    sum(len(result.alerts) for result in results),
                 )
             finally:
                 store.close()

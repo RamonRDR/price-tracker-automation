@@ -5,7 +5,16 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -31,7 +40,7 @@ class Product(Base):
     drop_percent: Mapped[Decimal | None] = mapped_column(Numeric(7, 3, asdecimal=True))
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
-    observations: Mapped[list["PriceObservation"]] = relationship(back_populates="product")
+    observations: Mapped[list[PriceObservation]] = relationship(back_populates="product")
 
 
 class PriceObservation(Base):

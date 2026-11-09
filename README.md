@@ -1,48 +1,72 @@
 # Price Tracker Automation
 
 [![CI](https://github.com/RamonRDR/price-tracker-automation/actions/workflows/ci.yml/badge.svg)](https://github.com/RamonRDR/price-tracker-automation/actions/workflows/ci.yml)
-![Python](https://img.shields.io/badge/Python-3.14-blue) ![License](https://img.shields.io/badge/License-MIT-green)
+![Python 3.14](https://img.shields.io/badge/Python-3.14-blue)
+[![MIT License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-A responsible, adapter-based price-monitoring CLI. Demonstrates Python automation, Playwright browser testing, HTTP extraction, SQLite persistence, typed validation and GitHub Actions.
+**Language:** **English (primary)** | [Português (Brasil)](README.pt-BR.md) | [Español](README.es.md)
 
-**Documentation:** English (main) | [Português](README.pt-BR.md) | [Español](README.es.md)
+A responsible, testable price-tracking CLI built with Python 3.14, Playwright, HTTP adapters, and SQLite. Designed as a practical portfolio project for **Python, Backend, Automation, and QA Automation** roles.
 
-## 1. Goal
+> **Responsible use:** Monitor only public demonstration pages or sources that explicitly allow automated access. This project does not bypass authentication, CAPTCHAs, rate limits, or access restrictions. The examples below use fictional URLs or a local test fixture.
 
-Track prices on public demonstration pages or sites **explicitly allowing automated access**. Compare past and current prices, and report meaningful changes. The tool never bypasses CAPTCHA, logins, rate limits or access controls. Verify permission before monitoring any URL.
+## 1. What it does
 
-## 2. Implemented features
+Price Tracker Automation registers a product URL, extracts its name and current price, stores timestamped observations, compares consecutive prices, and creates alerts when a configured threshold is met.
 
-- Register products by HTTP(S) URL with target and drop-percentage settings.
-- JSON-LD / httpx adapter and configurable CSS / Playwright Chromium adapter.
-- SQLAlchemy/SQLite products, immutable price observations and deduplicated alert events.
-- Decimal money, increases/decreases, local console summary and CSV export.
-- Bounded multi-product monitoring, limited retries and configurable frequency.
-- Optional STARTTLS SMTP notifications; pause/resume commands.
-- Python 3.14 quality gates, deterministic local HTTP and browser integration tests.
-- An approval-gated manual Action with a separate private repository for durable state.
+**Highlights**
 
-## 3. Technologies
+- Two configurable extraction adapters: **JSON-LD over httpx** and **CSS selectors through Playwright Chromium**.
+- Persistent **SQLite / SQLAlchemy** product, price-history, and alert records.
+- Monetary operations with **Decimal**, including increases and decreases.
+- Target-price alerts and percentage-drop alerts, with transition-based deduplication.
+- Multi-product monitoring with bounded retries, delays, and optional SMTP alerts.
+- Typer CLI with Rich tables, history inspection, pause/resume, and CSV export.
+- GitHub Actions quality checks on hosted runners; no live scraping in PR tests.
+- A separate, explicitly opt-in manual monitoring workflow with private durable storage.
 
-Python 3.14, Playwright, httpx, SQLite, SQLAlchemy, Pydantic, Typer, Rich, pytest, pytest-playwright, Ruff, hatchling and GitHub Actions.
+## 2. Technology stack
 
-## 4. Architecture
-
-| Module | Responsibility |
+| Area | Tools |
 | --- | --- |
-| `schemas.py`, `config.py` | Product/quote validation and settings |
-| `extractors.py` | JSON-LD/httpx and Playwright/CSS adapters |
-| `models.py`, `storage.py` | Products, historical observations and alert events |
-| `monitor.py` | Bounded orchestrator, comparisons and retries |
-| `notifications.py` | Optional SMTP alert digest |
-| `exporter.py`, `cli.py` | CSV and Typer/Rich interface |
-| `github_runner.py` | Approved remote monitoring with private durable state |
+| Runtime and validation | Python 3.14, Pydantic |
+| Extraction | httpx, Playwright (Chromium), HTML JSON-LD |
+| Persistence | SQLite, SQLAlchemy 2 |
+| Interface and output | Typer, Rich, CSV |
+| Notifications | Python SMTP with STARTTLS (optional) |
+| Testing and quality | pytest, pytest-playwright, Ruff |
+| Packaging and CI | hatchling, Python build, GitHub Actions |
 
-A successful check validates a quote, stores an observation, compares it with the previous one and records alerts within one transaction. See [ADR-0001](docs/adr/0001-controlled-monitoring.md).
+## 3. Architecture
 
-## 5. Installation
+~~~text
+User → Typer CLI → Monitoring service → Extraction adapter
+                   │                      ├── JSON-LD / httpx
+                   │                      └── CSS / Playwright
+                   ├── Pydantic quote validation
+                   ├── SQLAlchemy → SQLite
+                   │               ├── products
+                   │               ├── price_observations
+                   │               └── alert_events
+                   └── Alert handling → console / optional SMTP
+~~~
 
-Requires Python **3.14**.
+| File | Responsibility |
+| --- | --- |
+| `config.py`, `schemas.py` | Environment settings, URLs, product and quote validation |
+| `extractors.py` | HTTP JSON-LD and browser CSS extraction |
+| `models.py`, `storage.py` | SQLite entities, queries, transactions, alert creation |
+| `money.py` | Decimal monetary parsing and formatting |
+| `monitor.py` | Bounded retries, comparisons, monitoring results |
+| `notifications.py` | Optional SMTP digest for new alerts |
+| `cli.py`, `exporter.py` | CLI commands, tables, safe CSV output |
+| `github_runner.py` | Approved Actions monitoring with a private state repository |
+
+Each successful check records an observation and creates any new alert events in the same database transaction. Design rationale: [ADR-0001](docs/adr/0001-controlled-monitoring.md).
+
+## 4. Installation
+
+**Requirements:** Python **3.14**, Git, and Chromium installed through Playwright for the CSS adapter. SQLite requires no separate server.
 
 ~~~bash
 git clone https://github.com/RamonRDR/price-tracker-automation.git
@@ -55,67 +79,104 @@ python -m playwright install chromium
 price-tracker --help
 ~~~
 
-No database service is required. Local SQLite defaults to `~/.local/share/price-tracker/prices.db`.
+**While PR #1 is unmerged**, switch to `feat/price-tracker-complete-mvp` after cloning: the implementation is not on `main` yet.
 
-## 6. Command examples
+## 5. Quick start: an actual, controlled local demo
 
-**Fictional example URLs, not real commercial websites:**
+The repository includes fictional product HTML in `tests/fixtures/product.html`. You can verify the complete JSON-LD → database → CLI path without accessing a commercial website.
+
+**Terminal A** (start the local fixture server):
 
 ~~~bash
-price-tracker add "https://demo.example.org/widget" --target 80 --drop-percent 10
-price-tracker products
-price-tracker check 1
-price-tracker history 1 --limit 20
-price-tracker alerts --product-id 1
-price-tracker target 1 75
-price-tracker drop-alert 1 15
-price-tracker export --output history.csv
-price-tracker pause 1
-price-tracker resume 1
+python -m http.server 8765 --bind 127.0.0.1 --directory tests/fixtures
 ~~~
 
-For an authorized page requiring selectors:
+**Terminal B** (with the environment activated):
+
+~~~bash
+price-tracker add "http://127.0.0.1:8765/product.html" --target 1300 --drop-percent 10
+price-tracker check 1
+price-tracker products
+price-tracker history 1
+price-tracker alerts --product-id 1
+price-tracker export --output price-history.csv
+~~~
+
+The fixture contains a fictional **Demo Widget** priced at **USD 1,234.56**. The first successful check stores an observation and meets the sample USD 1,300 target. To reset the example, use a separate database via `--db ./demo-prices.db` with each command. This local demo is distinct from the GitHub Actions tests and never targets a real retailer.
+
+## 6. CLI reference
+
+| Command | Purpose |
+| --- | --- |
+| `price-tracker add URL` | Register an HTTP(S) product URL; no fetch on registration |
+| `price-tracker products` | List tracked products and their settings |
+| `price-tracker check [ID]` | Check one product or all active products |
+| `price-tracker monitor` | Perform one or more bounded monitoring passes |
+| `price-tracker history ID` | View stored observations |
+| `price-tracker alerts` | Review recorded alert events |
+| `price-tracker target ID AMOUNT` | Set a target-price threshold |
+| `price-tracker drop-alert ID PERCENT` | Set a percentage-drop threshold |
+| `price-tracker pause ID` / `resume ID` | Disable / enable a product |
+| `price-tracker export --output FILE` | Export recorded price history to CSV |
+
+For a permitted page with explicit selectors:
 
 ~~~bash
 price-tracker add "https://demo.example.org/item" \
-  --adapter css --name-selector "h1.product-name" \
-  --price-selector ".current-price" --currency USD
+  --adapter css \
+  --name-selector "h1.product-name" \
+  --price-selector ".current-price" \
+  --currency USD
 price-tracker check 2
 ~~~
 
-Registration is offline; only `check` or `monitor` fetches pages.
+`demo.example.org` is an **illustrative, fictional source**, not an endorsed website or a working retailer. Consult `price-tracker --help` and each command's `--help` for options.
 
-## 7. Configuration
+## 7. Configuration and security
 
-See [`.env.example`](.env.example). The app reads exported environment variables, but does not load `.env` automatically.
+Configuration is read from environment variables. See [`.env.example`](.env.example); local `.env` files are not loaded automatically and must not be committed.
 
-| Variable | Default | Meaning |
+| Variable | Default | Use |
 | --- | --- | --- |
-| `PRICE_TRACKER_DB` | user data directory | SQLite file (or use `--db`) |
-| `PRICE_TRACKER_TIMEOUT` | 15 | Request/browser timeout, seconds |
-| `PRICE_TRACKER_RETRIES` | 2 | Additional attempts (max 4) |
-| `PRICE_TRACKER_RETRY_DELAY` | 0.5 | Initial exponential backoff |
-| `PRICE_TRACKER_DELAY` | 1 | Seconds between products |
-| `PRICE_TRACKER_MAX_PRODUCTS` | 50 | Maximum products per pass |
-| `PRICE_TRACKER_SMTP_*` | unset | Optional SMTP/STARTTLS configuration |
+| `PRICE_TRACKER_DB` | `~/.local/share/price-tracker/prices.db` | SQLite database location, or pass `--db` |
+| `PRICE_TRACKER_TIMEOUT` | `15` | HTTP / browser timeout (seconds) |
+| `PRICE_TRACKER_RETRIES` | `2` | Additional source attempts; max 4 |
+| `PRICE_TRACKER_RETRY_DELAY` | `0.5` | Initial retry backoff (seconds) |
+| `PRICE_TRACKER_DELAY` | `1` | Gap between checked products (seconds) |
+| `PRICE_TRACKER_MAX_PRODUCTS` | `50` | Maximum active products checked per pass |
+| `PRICE_TRACKER_SMTP_HOST` | Unset | Optional SMTP hostname |
+| `PRICE_TRACKER_SMTP_PORT` | `587` if used | STARTTLS SMTP port |
+| `PRICE_TRACKER_SMTP_FROM` / `_TO` | Unset | Sender and recipient |
+| `PRICE_TRACKER_SMTP_USERNAME` / `_PASSWORD` | Unset | Optional credentials via environment only |
 
-Passwords and tokens must only be supplied via environment or Actions secrets.
+The CLI stores database state locally. The repository ignores private databases and environment files. Do not store credentials or personal product data in commits, logs, or public artifacts.
 
-## 8. Monitoring example and frequency
+## 8. Monitoring and scheduling
 
 ~~~bash
+# One pass over active products
 price-tracker monitor
+
+# Three passes separated by 60 minutes, then exit
 price-tracker monitor --every-minutes 60 --runs 3
+
+# One pass with optional SMTP delivery for newly recorded alerts
 price-tracker check --notify
 ~~~
 
-The default is one pass. Even repeated monitoring has an explicit finite run limit. Product errors do not stop checking other products; the process returns nonzero when a check fails. Sources must permit automation and be polled at a reasonable rate.
+Monitoring is bounded, not an infinite loop: default one pass, maximum 100 passes. Source errors are reported and other products can still be checked. Use sensible frequencies and follow each site's stated automation policy.
 
-## 9. History and alerts
+## 9. Price history, comparisons, and alerts
 
-`history` shows UTC timestamps, currency and Decimal amounts; `alerts` lists stored alert events; `export` creates CSV. Target alerts fire at the first price **at or below** the target and after a subsequent crossing from above. Percentage drops compare **adjacent observations**. Unchanged prices produce no repeat alerts. Alerts are committed before optional email delivery. SMTP failures are logged but email is **not automatically retried**.
+Every successful check stores a timestamped price observation. `history` displays the newest records, and `export` writes a CSV with `product_id`, `name`, `price`, `currency`, and `checked_at`. Product names are escaped to reduce spreadsheet-formula injection risk.
 
-## 10. Tests and packaging
+- **Target price:** fires when the first observation is at/below the target, or a later observation crosses from above to at/below it. Repeated below-target checks do not generate repeated target alerts.
+- **Percentage drop:** fires when the new price falls by at least the configured percentage relative to the **immediately previous** successful observation. This can trigger on separate qualifying drops.
+- **Price increase:** visible as a positive percent change; it is not an independent alert type.
+- **Currency change:** comparisons are rejected rather than comparing unrelated currencies.
+- **Email:** only attempted with `--notify` and working SMTP settings. Alerts are committed before email delivery, and failed deliveries are **not automatically resent**.
+
+## 10. Tests and code quality
 
 ~~~bash
 python -m pytest -q -m "not browser"
@@ -126,31 +187,28 @@ ruff format --check .
 python -m build
 ~~~
 
-Tests use fake prices, mocks and a controlled loopback HTML server. No external commercial site is called by CI. Tests cover validation, HTTP failures/timeouts, layout changes, money, SQLite, change detection, alert deduplication, CSV and CLI.
+Tests use mocks and a loopback HTTP server with controlled HTML. They cover URL validation, extraction and layout changes, formats and unavailable prices, failures/timeouts, SQLite persistence, target and drop alerts, deduplication, CSV, and CLI behavior. No live retailer is required.
 
-## 11. GitHub Actions / durable state
+## 11. GitHub Actions
 
-`ci.yml` runs Ruff, Python 3.14 tests, Chromium tests on **local HTML only**, and wheel/sdist build. `manual-monitor.yml` is **manual-only and disabled unless explicitly approved**; there is **no active cron**. To enable later, the owner must:
+- **`.github/workflows/ci.yml`:** Ruff lint and format, Python 3.14 unit/local HTTP tests, controlled Playwright Chromium integration, and wheel/sdist build.
+- **`.github/workflows/manual-monitor.yml`:** manual dispatch only, guarded by a repository variable and an explicit approval checkbox. **No scheduled trigger is enabled.**
 
-1. Approve the sources and create a separate **private** GitHub repository with branch `monitor-state`.
-2. Create a fine-grained token with Contents read/write **only** in that private state repository.
-3. Set repository variables `TRACKER_MONITOR_APPROVED=true`, `TRACKER_STATE_REPO`, `TRACKER_STATE_BRANCH`, `TRACKER_ALLOWED_HOSTS`.
-4. Set Actions secrets `TRACKER_STATE_TOKEN` and `TRACKER_PRODUCTS_JSON`, with approved HTTPS URLs. Optional SMTP secrets are separate.
-5. Approve the checkbox when manually dispatching a run. Adding a `schedule` trigger requires **another explicit authorization**.
+Hosted runners are temporary. To retain price history **after separate owner approval**, manual monitoring requires an owner-created **private state repository** with branch `monitor-state` and a fine-grained token with Contents read/write only for that repository. Configure repository variables `TRACKER_MONITOR_APPROVED`, `TRACKER_STATE_REPO`, `TRACKER_STATE_BRANCH`, `TRACKER_ALLOWED_HOSTS`, plus encrypted secrets `TRACKER_STATE_TOKEN` and `TRACKER_PRODUCTS_JSON` (a JSON array of approved HTTPS sources). Optional SMTP secrets are independent.
 
-Example secret (fictional): `[{"url":"https://demo.example.org/widget","adapter":"jsonld"}]`. The runner checks that the state repository is private and distinct from this public one, downloads SQLite, runs one bounded pass and stores the updated SQLite via GitHub's Contents API and blob SHA conflict protection. No public artifact, no state commit on public `main`.
+The runner refuses public state repositories and unapproved hosts, uses one bounded pass, and writes SQLite to the private repository rather than to this public project's `main` or public artifacts. This design requires owner setup; **external monitoring and recurring schedules are not activated by this repository**.
 
 ## 12. Known limitations
 
-- Generic JSON-LD and CSS adapters require compatible metadata or selectors.
-- Ambiguous number formats may require source-specific normalization.
-- SQLite is designed for small/serial monitoring, not parallel distributed ingestion.
-- Drop percentages compare the previous check, not the all-time peak.
-- Changing a target while already below it does not immediately trigger an alert.
-- SMTP delivery is best-effort; no transactional email outbox.
-- Remote scheduling requires private-state setup and separate approval.
-- No authentication, CAPTCHA bypass or avoidance of website restrictions.
+- Generic adapters depend on compatible JSON-LD or stable selectors on allowed pages.
+- Ambiguous currency formatting may require a source-specific adapter.
+- SQLite is suitable for small, serial monitoring, not distributed high-frequency scraping.
+- Percentage drops use adjacent observations rather than the all-time high.
+- Changing a target while an item is already below that target does not immediately generate a new target alert.
+- SMTP is best-effort, without guaranteed delivery or an outbox.
+- Persistent GitHub Actions monitoring requires a separately provisioned private state repository and explicit authorization.
+- This project never provides CAPTCHA bypass, authentication handling, stealth automation, or workarounds for blocked sources.
 
 ## 13. License
 
-[MIT](LICENSE). All examples are fictional. Use only with sites that allow your automation.
+Licensed under the [MIT License](LICENSE). Example sources and products are fictional unless explicitly identified as local fixtures.

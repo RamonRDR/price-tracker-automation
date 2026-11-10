@@ -40,12 +40,18 @@ def parse_price(raw: str | int | float | Decimal) -> Decimal:
         ):
             raise PriceUnavailable("Price contains unsupported or ambiguous text")
         text = _SPACES.sub("", token.group(0))
-        if text.count(".") > 1 and "," not in text:
-            if not re.fullmatch(r"\d{1,3}(?:\.\d{3})+", text):
-                raise PriceUnavailable("Invalid thousands grouping")
-        if text.count(",") > 1 and "." not in text:
-            if not re.fullmatch(r"\d{1,3}(?:,\d{3})+", text):
-                raise PriceUnavailable("Invalid thousands grouping")
+        if (
+            text.count(".") > 1
+            and "," not in text
+            and not re.fullmatch(r"\d{1,3}(?:\.\d{3})+", text)
+        ):
+            raise PriceUnavailable("Invalid thousands grouping")
+        if (
+            text.count(",") > 1
+            and "." not in text
+            and not re.fullmatch(r"\d{1,3}(?:,\d{3})+", text)
+        ):
+            raise PriceUnavailable("Invalid thousands grouping")
         if "." in text and "," in text:
             decimal_mark = "," if text.rfind(",") > text.rfind(".") else "."
             group_mark = "." if decimal_mark == "," else ","

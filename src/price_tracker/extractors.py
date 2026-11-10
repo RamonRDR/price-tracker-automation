@@ -8,6 +8,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 import httpx
+from pydantic import ValidationError
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 from playwright.sync_api import sync_playwright
@@ -202,7 +203,10 @@ def fetch_css(product: Product, settings: Settings) -> PriceQuote:
                 price = page.locator(product.price_selector).first.inner_text(
                     timeout=int(settings.timeout_seconds * 1000)
                 )
-                return PriceQuote(name=name, price=price, currency=product.currency)
+                try:
+                    return PriceQuote(name=name, price=price, currency=product.currency)
+                except ValidationError as exc:
+                    raise PriceUnavailable("CSS source produced missing or invalid quote data") from exc
             finally:
                 browser.close()
     except (PlaywrightTimeout, PlaywrightError) as exc:

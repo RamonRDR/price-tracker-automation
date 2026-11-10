@@ -8,6 +8,7 @@ import pytest
 
 from price_tracker.errors import SourceError
 from price_tracker.extractors import fetch_css, source_is_approved
+from price_tracker.monitor import check_many
 from price_tracker.schemas import ProductInput
 
 
@@ -54,12 +55,15 @@ def guarded_servers() -> Iterator[tuple[str, list[str]]]:
                 self.send_header("Location", foreign_url)
                 self.end_headers()
                 return
-            body = (
-                "<!doctype html><html><body>"
+            if self.path == "/empty":
+                body = b'<html><body><h1 id="name"></h1><div id="price">20.00</div></body></html>'
+            else:
+                body = (
+                    "<!doctype html><html><body>"
                 '<h1 id="name">Safe demo</h1><div id="price">20.00</div>'
                 f'<script>fetch("{foreign_url}").catch(() => {{}});</script>'
                 "</body></html>"
-            ).encode()
+                ).encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
             self.end_headers()
@@ -116,4 +120,33 @@ def test_external_subresource_aborted_before_fetch(store, settings, guarded_serv
     )
     quote = fetch_css(product, settings)
     assert quote.name == "Safe demo"
+    assert forbidden_hits == []
+
+
+@pytest.mark.browser
+def test_invalid_css_quote_does_not_abort_other_products(store, settings, guarded_servers):
+    url, forbidden_hits = guarded_servers
+    invalid = store.add(
+        ProductInput(
+            url=f"{url}/empty",
+            adapter="css",
+            name_selector="#name",
+            price_selector="#price",
+            currency="USD",
+        )
+    )
+    valid = store.add(
+        ProductInput(
+            url=f"{url}/product",
+            adapter="css",
+            name_selector="#name",
+            price_selector="#price",
+            currency="USD",
+        )
+    )
+    results = check_many(store, settings, sleep=lambda _: None)
+    assert [result.product_id for result in results] == [invalid.id, valid.id]
+    assert [result.status for result in results] == ["unavailable", "ok"]
+    assert store.history(invalid.id) == []
+    assert len(store.history(valid.id)) == 1
     assert forbidden_hits == []

@@ -67,3 +67,18 @@ def test_update_alerts_and_pause(store: Store) -> None:
     store.set_active(product.id, active=False)
     assert not store.get(product.id).active
     assert store.get(product.id).target == Decimal("100")
+
+
+def test_configured_currency_is_checked_on_first_quote(store: Store) -> None:
+    product = store.add(
+        ProductInput(url="https://example.test/currency", currency="USD", target=Decimal("100"))
+    )
+    with pytest.raises(InvalidProduct, match="configured product currency"):
+        store.save_check(product.id, PriceQuote(name="Widget", price=80, currency="EUR"))
+    assert store.history(product.id) == []
+    assert store.alerts(product.id) == []
+    assert store.get(product.id).currency == "USD"
+
+    store.save_check(product.id, PriceQuote(name="Widget", price=90, currency="USD"))
+    assert len(store.history(product.id)) == 1
+    assert len(store.alerts(product.id)) == 1

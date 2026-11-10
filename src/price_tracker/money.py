@@ -5,7 +5,8 @@ from decimal import Decimal, InvalidOperation
 
 from price_tracker.errors import PriceUnavailable
 
-_GROUP = re.compile(r"[^0-9.,\u00a0\s]")
+_NUMBER_TOKEN = re.compile(r"\d+(?:[.,]\d+|[ \u00a0\u202f]\d{3}(?!\d))*")
+_CURRENCY_AFFIX = re.compile(r"(?:[A-Za-z]{3}|[A-Za-z]{1,3}[$€£¥₹₽₩₫]|[$€£¥₹₽₩₫])")
 _SPACES = re.compile(r"[\s\u00a0\u202f]")
 
 
@@ -25,9 +26,38 @@ def parse_price(raw: str | int | float | Decimal) -> Decimal:
     elif isinstance(raw, float):
         amount = Decimal(str(raw))
     else:
-        text = _SPACES.sub("", _GROUP.sub("", str(raw)))
-        if not text or not any(c.isdigit() for c in text):
-            raise PriceUnavailable("Price is missing or is not numeric")
+        source = str(raw).strip()
+        matches = list(_NUMBER_TOKEN.finditer(source))
+        if len(matches) != 1:
+            raise PriceUnavailable("Price must contain exactly one monetary amount")
+        token = matches[0]
+        prefix = source[: token.start()].strip()
+        suffix = source[token.end() :].strip()
+        if (
+            (prefix and suffix)
+            or (prefix and not _CURRENCY_AFFIX.fullmatch(prefix))
+            or (suffix and not _CURRENCY_AFFIX.fullmatch(suffix))
+        ):
+            raise PriceUnavailable("Price contains unsupported or ambiguous text")
+        text = _SPACES.sub("", token.group(0))
+        if text.count(".") > 1 and "," not in text:
+            if not re.fullmatch(r"\d{1,3}(?:\.\d{3})+", text):
+                raise PriceUnavailable("Invalid thousands grouping")
+        if text.count(",") > 1 and "." not in text:
+            if not re.fullmatch(r"\d{1,3}(?:,\d{3})+", text):
+                raise PriceUnavailable("Invalid thousands grouping")
+        if "." in text and "," in text:
+            decimal_mark = "," if text.rfind(",") > text.rfind(".") else "."
+            group_mark = "." if decimal_mark == "," else ","
+            integer_part, decimal_part = text.rsplit(decimal_mark, 1)
+            grouped = integer_part.split(group_mark)
+            if (
+                not (1 <= len(decimal_part) <= 4)
+                or not decimal_part.isdigit()
+                or any(len(part) != 3 for part in grouped[1:])
+                or not (1 <= len(grouped[0]) <= 3 and grouped[0].isdigit())
+            ):
+                raise PriceUnavailable("Invalid grouped monetary value")
         if "," in text and "." in text:
             decimal_mark = "," if text.rfind(",") > text.rfind(".") else "."
             group_mark = "." if decimal_mark == "," else ","

@@ -101,7 +101,7 @@ def extract_jsonld_html(html: str, *, fallback_currency: str | None = None) -> P
                             currency=str(currency).upper(),
                             checked_at=datetime.now(UTC),
                         )
-                    except ValueError:
+                    except (PriceUnavailable, ValueError):
                         continue
     raise PriceUnavailable("No supported, available Product/Offer price in JSON-LD")
 

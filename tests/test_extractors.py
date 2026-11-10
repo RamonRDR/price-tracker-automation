@@ -76,3 +76,19 @@ def test_playwright_css_local_fixture(store, settings, local_pages) -> None:
     quote = fetch_css(product, settings)
     assert quote.name == "Another Demo Widget"
     assert quote.price == Decimal("1234.5600")
+
+
+@pytest.mark.parametrize("bad_price", ["N/A", "0", "-1"])
+def test_jsonld_skips_bad_offers_and_uses_next_valid_price(bad_price: str) -> None:
+    document = {
+        "@type": "Product",
+        "name": "Two offers",
+        "offers": [
+            {"price": bad_price, "priceCurrency": "USD"},
+            {"price": "19.99", "priceCurrency": "USD"},
+        ],
+    }
+    html = f'<script type="application/ld+json">{json.dumps(document)}</script>'
+    quote = extract_jsonld_html(html)
+    assert quote.price == Decimal("19.9900")
+    assert quote.currency == "USD"

@@ -27,3 +27,20 @@ def test_money_formats(raw: object, expected: str) -> None:
 def test_missing_or_invalid_money(raw: str) -> None:
     with pytest.raises(PriceUnavailable):
         parse_price(raw)
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "2 for $10.00",
+        "3 payments of USD 20.00",
+        "was $100.00 now $80.00",
+        "USD 20.00 / month",
+        "2 10.00",
+        "1.23.456",
+        "1.23,45",
+    ],
+)
+def test_ambiguous_multi_amount_promotions_are_rejected(raw: str) -> None:
+    with pytest.raises(PriceUnavailable):
+        parse_price(raw)

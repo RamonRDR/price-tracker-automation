@@ -59,7 +59,8 @@ def _read_state(
     blob = _api(client, "GET", f"/repos/{repository}/git/blobs/{sha}").json()
     if blob.get("encoding") != "base64" or not blob.get("content"):
         raise ValueError("Git Blob response does not contain complete encoded state")
-    data = base64.b64decode(blob["content"], validate=True)
+    # GitHub wraps Base64 content at line boundaries in the Git Blob API.
+    data = base64.b64decode("".join(blob["content"].split()), validate=True)
     if len(data) != metadata["size"] or len(data) != blob.get("size"):
         raise ValueError("Persisted state size does not match Git metadata")
     if not data.startswith(b"SQLite format 3\x00"):

@@ -1,10 +1,16 @@
-# Price Tracker Automation
+<div align="center">
+
+# Price Tracker Automation 🏷️
+
+**Track prices responsibly. Follow every change. Get alerts with confidence.**
+
+[🇺🇸 English](README.md) · [🇧🇷 Português](README.pt-BR.md) · [🇪🇸 Español](README.es.md)
 
 [![CI](https://github.com/RamonRDR/price-tracker-automation/actions/workflows/ci.yml/badge.svg)](https://github.com/RamonRDR/price-tracker-automation/actions/workflows/ci.yml)
-![Python 3.14](https://img.shields.io/badge/Python-3.14-blue)
-[![MIT License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![Python 3.14](https://img.shields.io/badge/Python-3.14-blue)](https://www.python.org/)
+[![MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-**Language:** **English (primary)** | [Português (Brasil)](README.pt-BR.md) | [Español](README.es.md)
+</div>
 
 A responsible, testable price-tracking CLI built with Python 3.14, Playwright, HTTP adapters, and SQLite. Designed as a practical portfolio project for **Python, Backend, Automation, and QA Automation** roles.
 

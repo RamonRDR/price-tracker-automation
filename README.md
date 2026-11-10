@@ -196,11 +196,15 @@ Tests use mocks and a loopback HTTP server with controlled HTML. They cover URL 
 
 Hosted runners are temporary. To retain price history **after separate owner approval**, manual monitoring requires an owner-created **private state repository** with branch `monitor-state` and a fine-grained token with Contents read/write only for that repository. Configure repository variables `TRACKER_MONITOR_APPROVED`, `TRACKER_STATE_REPO`, `TRACKER_STATE_BRANCH`, `TRACKER_ALLOWED_HOSTS`, plus encrypted secrets `TRACKER_STATE_TOKEN` and `TRACKER_PRODUCTS_JSON` (a JSON array of approved HTTPS sources). Optional SMTP secrets are independent.
 
+The runner synchronizes the currently approved product list before checking any URL, deactivating previously stored sources that are no longer authorized. Playwright blocks unapproved subresources and redirects **before** following them; even redirects to an otherwise allowed URL are deliberately not followed. Chromium and its OS dependencies are installed in the monitoring job.
+
+For durable state, the runner retrieves the complete SQLite file through GitHub's **Git Blob API** rather than inline Contents data (which can be absent above 1 MB), verifies its size and integrity, and rejects invalid or oversized databases (32 MiB limit) without overwriting history. It commits the new state **before** attempting SMTP delivery, preventing duplicate notifications if the upload fails. Failed SMTP messages are not automatically retried.
+
 The runner refuses public state repositories and unapproved hosts, uses one bounded pass, and writes SQLite to the private repository rather than to this public project's `main` or public artifacts. This design requires owner setup; **external monitoring and recurring schedules are not activated by this repository**.
 
 ## 12. Known limitations
 
-- Generic adapters depend on compatible JSON-LD or stable selectors on allowed pages.
+- Generic adapters depend on compatible JSON-LD or stable selectors on allowed pages. Browser redirects are intentionally blocked, including redirects to approved destinations.
 - Ambiguous currency formatting may require a source-specific adapter.
 - SQLite is suitable for small, serial monitoring, not distributed high-frequency scraping.
 - Percentage drops use adjacent observations rather than the all-time high.

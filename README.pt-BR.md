@@ -196,11 +196,15 @@ Mocks e servidor HTTP local garantem testes determinísticos para URLs inválida
 
 Como os runners são temporários, após **aprovação separada do proprietário** o monitoramento remoto requer um **repositório privado separado**, com branch `monitor-state` e token de escopo restrito com Contents read/write somente nele. Configurar as variáveis `TRACKER_MONITOR_APPROVED`, `TRACKER_STATE_REPO`, `TRACKER_STATE_BRANCH` e `TRACKER_ALLOWED_HOSTS`; armazenar `TRACKER_STATE_TOKEN` e `TRACKER_PRODUCTS_JSON` (lista JSON de fontes HTTPS autorizadas) como secrets. SMTP é opcional.
 
+O runner sincroniza a lista atual de produtos autorizados antes da consulta e desativa fontes antigas que não estejam mais aprovadas. O Playwright bloqueia redirecionamentos e recursos externos não autorizados **antes da requisição**; por segurança, nenhum redirecionamento é seguido, mesmo que o destino esteja aprovado. O workflow instala o Chromium e suas dependências.
+
+O SQLite durável é baixado pela **API Git Blob**, pois os dados inline da API Contents podem faltar acima de 1 MB. Tamanho e integridade são validados, com limite de 32 MiB e rejeição de arquivos inconsistentes, sem sobrescrever o histórico. O banco é salvo no repositório privado **antes** do envio SMTP, prevenindo alertas repetidos quando o upload falha. E-mails que falham não são reenviados automaticamente.
+
 O runner rejeita repositórios públicos de estado e hosts não autorizados, executa uma única rodada e armazena o SQLite no repositório privado, nunca na `main` pública ou em artifacts públicos. Este projeto **não ativa monitoramento externo nem agendamento recorrente**.
 
 ## 12. Limitações conhecidas
 
-- Os adaptadores exigem JSON-LD compatível ou seletores CSS estáveis em fontes autorizadas.
+- Os adaptadores exigem JSON-LD compatível ou seletores CSS estáveis em fontes autorizadas. Redirecionamentos do navegador são bloqueados, inclusive para destinos autorizados.
 - Valores monetários ambíguos podem necessitar de normalização por adaptador.
 - SQLite atende monitoramento pequeno/serial, não scraping distribuído em alta escala.
 - A queda percentual compara observações consecutivas, não o maior preço histórico.

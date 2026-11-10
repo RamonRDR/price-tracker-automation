@@ -196,11 +196,15 @@ Las pruebas utilizan mocks y un servidor HTTP local: validación de URL, precios
 
 Debido al almacenamiento temporal de los runners, tras una **autorización separada del propietario** el monitoreo remoto necesita un **repositorio privado independiente** con rama `monitor-state` y un token fino con acceso Contents read/write solamente allí. Configura `TRACKER_MONITOR_APPROVED`, `TRACKER_STATE_REPO`, `TRACKER_STATE_BRANCH` y `TRACKER_ALLOWED_HOSTS` como variables; `TRACKER_STATE_TOKEN` y `TRACKER_PRODUCTS_JSON` (lista JSON de fuentes HTTPS autorizadas) como secretos. SMTP es opcional.
 
+El runner sincroniza la lista vigente de productos autorizados antes de consultar y desactiva las fuentes antiguas que hayan perdido autorización. Playwright bloquea redirecciones y recursos externos no autorizados **antes de enviar solicitudes**; por seguridad, no sigue ninguna redirección, incluso cuando el destino está aprobado. El workflow instala Chromium y sus dependencias.
+
+El estado SQLite se recupera mediante la **API Git Blob**, porque los datos inline de Contents pueden faltar por encima de 1 MB. Se comprueban el tamaño y la integridad, con límite de 32 MiB, y se rechazan archivos incorrectos sin sobrescribir el historial. Los cambios se guardan en el repositorio privado **antes** de enviar correos SMTP, evitando notificaciones duplicadas cuando falla la subida. Los correos fallidos no se reenvían automáticamente.
+
 El runner rechaza repositorios de estado públicos y hosts no autorizados, ejecuta una sola ronda y guarda SQLite en el repositorio privado, nunca en la `main` pública ni en artifacts públicos. El proyecto **no activa monitoreo externo ni programación recurrente**.
 
 ## 12. Limitaciones conocidas
 
-- Los adaptadores necesitan JSON-LD compatible o selectores CSS estables en fuentes autorizadas.
+- Los adaptadores necesitan JSON-LD compatible o selectores CSS estables en fuentes autorizadas. Las redirecciones del navegador se bloquean, incluso hacia destinos aprobados.
 - Los formatos monetarios ambiguos pueden requerir normalización específica.
 - SQLite es adecuado para cargas pequeñas/seriales, no scraping distribuido de alta frecuencia.
 - La caída porcentual usa observaciones consecutivas, no el máximo histórico.

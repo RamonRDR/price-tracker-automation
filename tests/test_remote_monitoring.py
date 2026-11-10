@@ -115,9 +115,7 @@ def _seed_state(tmp_path, *, large: bool = False) -> bytes:
             ProductInput(url="https://allowed.example.org/keep", target=Decimal("100"))
         )
         revoke = store.add(ProductInput(url="https://revoked.example.org/old"))
-        store.save_check(
-            revoke.id, PriceQuote(name="Old observation", price=150, currency="USD")
-        )
+        store.save_check(revoke.id, PriceQuote(name="Old observation", price=150, currency="USD"))
         assert keep.id != revoke.id
     finally:
         store.close()

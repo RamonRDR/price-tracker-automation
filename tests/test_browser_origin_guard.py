@@ -86,9 +86,7 @@ def guarded_servers() -> Iterator[tuple[str, list[str]]]:
 
 
 @pytest.mark.browser
-def test_cross_origin_redirect_blocked_before_any_http_request(
-    store, settings, guarded_servers
-):
+def test_cross_origin_redirect_blocked_before_any_http_request(store, settings, guarded_servers):
     url, forbidden_hits = guarded_servers
     product = store.add(
         ProductInput(

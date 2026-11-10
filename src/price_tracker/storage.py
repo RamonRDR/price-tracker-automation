@@ -58,6 +58,34 @@ class Store:
             session.flush()
             return product
 
+    def sync_approved_products(self, sources: list[ProductInput]) -> list[Product]:
+        """Only currently approved products remain active; retain their price history."""
+        approved_urls = [str(source.url) for source in sources]
+        if len(approved_urls) != len(set(approved_urls)):
+            raise InvalidProduct("Duplicate URLs in the approved product manifest")
+        with self.session() as session:
+            existing = {item.url: item for item in session.scalars(select(Product))}
+            for item in existing.values():
+                item.active = False
+            selected: list[Product] = []
+            for source in sources:
+                url = str(source.url)
+                product = existing.get(url)
+                if product is None:
+                    product = Product(url=url, name=url)
+                    session.add(product)
+                    existing[url] = product
+                product.adapter = source.adapter
+                product.name_selector = source.name_selector
+                product.price_selector = source.price_selector
+                product.currency = source.currency or product.currency
+                product.target = source.target
+                product.drop_percent = source.drop_percent
+                product.active = True
+                selected.append(product)
+            session.flush()
+            return selected
+
     def get(self, product_id: int) -> Product:
         with self.session() as session:
             product = session.get(Product, product_id)

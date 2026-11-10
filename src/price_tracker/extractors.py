@@ -105,7 +105,31 @@ def extract_jsonld_html(html: str, *, fallback_currency: str | None = None) -> P
     raise PriceUnavailable("No supported, available Product/Offer price in JSON-LD")
 
 
+def source_is_approved(url: str, product: Product, settings: Settings) -> bool:
+    """Allow only the registered origin, or approved HTTPS hosts in remote mode."""
+    try:
+        parsed = urlparse(url)
+        original = urlparse(product.url)
+        if parsed.scheme not in {"http", "https"} or parsed.username or parsed.password:
+            return False
+        if not parsed.hostname:
+            return False
+        if settings.require_https and (parsed.scheme != "https" or parsed.port not in (None, 443)):
+            return False
+        if settings.allowed_hosts is not None:
+            return parsed.scheme == "https" and parsed.hostname in settings.allowed_hosts
+        return (
+            parsed.scheme == original.scheme
+            and parsed.hostname == original.hostname
+            and parsed.port == original.port
+        )
+    except ValueError:
+        return False
+
+
 def fetch_jsonld(product: Product, settings: Settings) -> PriceQuote:
+    if not source_is_approved(product.url, product, settings):
+        raise PriceUnavailable("Source is not approved for access")
     try:
         with httpx.Client(
             timeout=settings.timeout_seconds,
@@ -127,11 +151,26 @@ def fetch_jsonld(product: Product, settings: Settings) -> PriceQuote:
 def fetch_css(product: Product, settings: Settings) -> PriceQuote:
     if not product.name_selector or not product.price_selector or not product.currency:
         raise PriceUnavailable("CSS selectors and currency are not configured")
+    if not source_is_approved(product.url, product, settings):
+        raise PriceUnavailable("Source is not approved for access")
     try:
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(headless=True)
             try:
-                page = browser.new_page()
+                # Route interception is installed BEFORE navigation. It covers redirects
+                # and subresources; service workers and WebSockets are disabled.
+                context = browser.new_context(service_workers="block")
+
+                def guard(route) -> None:
+                    if source_is_approved(route.request.url, product, settings):
+                        route.continue_()
+                    else:
+                        logger.warning("Blocked browser request outside approved origins")
+                        route.abort("blockedbyclient")
+
+                context.route("**/*", guard)
+                context.route_web_socket("**/*", lambda websocket: websocket.close())
+                page = context.new_page()
                 response = page.goto(
                     product.url,
                     wait_until="domcontentloaded",
@@ -141,8 +180,8 @@ def fetch_css(product: Product, settings: Settings) -> PriceQuote:
                     raise PriceUnavailable("Source denied automated access")
                 if response and response.status >= 400:
                     raise SourceError(f"Browser returned HTTP {response.status}")
-                if urlparse(page.url).hostname != urlparse(product.url).hostname:
-                    raise SourceError("Cross-host redirects are not followed")
+                if not source_is_approved(page.url, product, settings):
+                    raise SourceError("Browser navigated outside approved origins")
                 name = (
                     page.locator(product.name_selector)
                     .first.inner_text(timeout=int(settings.timeout_seconds * 1000))

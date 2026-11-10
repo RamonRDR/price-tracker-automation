@@ -1,13 +1,11 @@
-"""Opt-in GitHub Actions bridge with state in a SEPARATE PRIVATE repository.
-
-Never commit SQLite history, tracked URLs or credentials into this public source repository.
-The private state branch and a fine-grained Contents token must be set up by the owner.
-"""
+"""Approval-gated GitHub Actions monitoring with durable state in a private repository."""
 
 import base64
+import hashlib
 import json
 import logging
 import os
+import smtplib
 import tempfile
 from pathlib import Path
 from urllib.parse import urlparse
@@ -19,11 +17,13 @@ from price_tracker.config import Settings
 from price_tracker.errors import InvalidProduct
 from price_tracker.logging_config import setup_logging
 from price_tracker.monitor import check_many
+from price_tracker.notifications import send_email
 from price_tracker.schemas import ProductInput
 from price_tracker.storage import Store
 
 logger = logging.getLogger("price_tracker.github_runner")
 STATE_PATH = "state/price-tracker.sqlite3"
+MAX_STATE_BYTES = 32 * 1024 * 1024
 
 
 def _required(key: str) -> str:
@@ -39,10 +39,68 @@ def _api(client: httpx.Client, method: str, path: str, **kwargs: object) -> http
     return response
 
 
+def _read_state(
+    client: httpx.Client, repository: str, branch: str
+) -> tuple[str | None, bytes | None]:
+    """Fetch binary data through the Git Blob API; never trust inline Contents encoding."""
+    content_path = f"/repos/{repository}/contents/{STATE_PATH}"
+    response = client.get("https://api.github.com" + content_path, params={"ref": branch})
+    if response.status_code == 404:
+        return None, None
+    response.raise_for_status()
+    metadata = response.json()
+    sha = metadata["sha"]
+    if metadata.get("type") != "file":
+        raise ValueError("Persisted state is not a file")
+    if not 0 < metadata["size"] <= MAX_STATE_BYTES:
+        raise ValueError("Persisted state exceeds allowed size or is empty")
+
+    # Contents JSON omits inline Base64 after 1 MB. Git Blobs serves the full content.
+    blob = _api(client, "GET", f"/repos/{repository}/git/blobs/{sha}").json()
+    if blob.get("encoding") != "base64" or not blob.get("content"):
+        raise ValueError("Git Blob response does not contain complete encoded state")
+    data = base64.b64decode(blob["content"], validate=True)
+    if len(data) != metadata["size"] or len(data) != blob.get("size"):
+        raise ValueError("Persisted state size does not match Git metadata")
+    if not data.startswith(b"SQLite format 3\x00"):
+        raise ValueError("Persisted state is not a valid SQLite database")
+    # GitHub repositories with 40-character object IDs use Git SHA-1.
+    if len(sha) == 40:
+        digest = hashlib.sha1(
+            b"blob " + str(len(data)).encode("ascii") + b"\x00" + data,
+            usedforsecurity=False,
+        ).hexdigest()
+        if digest != sha or blob.get("sha") != sha:
+            raise ValueError("Persisted state Git object hash mismatch")
+    return sha, data
+
+
+def _approved_products(allowed_hosts: set[str]) -> list[ProductInput]:
+    raw = json.loads(_required("TRACKER_PRODUCTS_JSON"))
+    if not isinstance(raw, list) or not raw:
+        raise ValueError("TRACKER_PRODUCTS_JSON must be a non-empty array")
+    if len(raw) > 50:
+        raise ValueError("Maximum 50 approved products per run")
+    approved = []
+    for entry in raw:
+        product = ProductInput.model_validate(entry)
+        parsed = urlparse(str(product.url))
+        if (
+            parsed.scheme != "https"
+            or parsed.port not in (None, 443)
+            or parsed.hostname not in allowed_hosts
+            or parsed.username is not None
+            or parsed.password is not None
+        ):
+            raise InvalidProduct("All scheduled sources must use approved HTTPS hosts")
+        approved.append(product)
+    return approved
+
+
 def execute() -> int:
-    """One pass only; requires explicit opt-in AND private durable state."""
+    """One approved monitoring pass, with state committed before any outbound alert."""
     if os.environ.get("TRACKER_MONITOR_APPROVED") != "true":
-        logger.info("Remote monitoring is disabled; no HTTP requests were made.")
+        logger.info("Remote monitoring disabled; no HTTP requests were made")
         return 0
 
     repository = _required("TRACKER_STATE_REPO")
@@ -56,30 +114,13 @@ def execute() -> int:
     if not allowed_hosts:
         raise ValueError("TRACKER_ALLOWED_HOSTS must not be empty")
     if repository.casefold() == source_repository.casefold():
-        raise ValueError("State repository must not be this public source repository")
+        raise ValueError("State repository must not be the public source repository")
     if repository.count("/") != 1:
         raise ValueError("TRACKER_STATE_REPO must have form owner/repository")
     branch = os.environ.get("TRACKER_STATE_BRANCH") or "monitor-state"
     if not branch.replace("-", "").replace("_", "").isalnum():
         raise ValueError("Unsafe state branch name")
-
-    raw_products = json.loads(_required("TRACKER_PRODUCTS_JSON"))
-    if not isinstance(raw_products, list) or not raw_products:
-        raise ValueError("TRACKER_PRODUCTS_JSON must be a non-empty JSON array")
-    products: list[ProductInput] = []
-    for entry in raw_products:
-        product = ProductInput.model_validate(entry)
-        parsed = urlparse(str(product.url))
-        if (
-            parsed.scheme != "https"
-            or parsed.hostname not in allowed_hosts
-            or parsed.username is not None
-            or parsed.password is not None
-        ):
-            raise InvalidProduct("All scheduled sources must use explicitly approved HTTPS hosts")
-        products.append(product)
-    if len(products) > 50:
-        raise ValueError("Maximum 50 scheduled products per run")
+    products = _approved_products(allowed_hosts)
 
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
     with httpx.Client(timeout=30, headers=headers) as client:
@@ -87,49 +128,54 @@ def execute() -> int:
         if not metadata.get("private"):
             raise ValueError("Durable state repository must be private")
         _api(client, "GET", f"/repos/{repository}/branches/{branch}")
-        state_url = f"/repos/{repository}/contents/{STATE_PATH}"
-        remote = client.get("https://api.github.com" + state_url, params={"ref": branch})
-        if remote.status_code == 404:
-            previous_sha = None
-            database_bytes = None
-        else:
-            remote.raise_for_status()
-            payload = remote.json()
-            previous_sha = payload["sha"]
-            database_bytes = base64.b64decode(payload["content"])
+        previous_sha, database_bytes = _read_state(client, repository, branch)
+
         with tempfile.TemporaryDirectory(prefix="price-tracker-") as folder:
-            db_path = Path(folder) / "state.sqlite3"
+            database = Path(folder) / "state.sqlite3"
             if database_bytes is not None:
-                db_path.write_bytes(database_bytes)
+                database.write_bytes(database_bytes)
             settings = Settings.from_env()
-            settings.database_path = db_path
-            store = Store(db_path)
+            settings.database_path = database
+            settings.allowed_hosts = frozenset(allowed_hosts)
+            settings.require_https = True
+            settings.max_products_per_run = len(products)
+            store = Store(database)
             try:
-                existing = {item.url for item in store.list_products()}
-                for data in products:
-                    if str(data.url) not in existing:
-                        store.add(data)
-                        existing.add(str(data.url))
-                results = check_many(store, settings, notify=True)
+                # Revocation and configuration changes take effect on every run.
+                store.sync_approved_products(products)
+                results = check_many(store, settings, notify=False)
                 failed = sum(result.status != "ok" for result in results)
+                new_alerts = [alert for result in results for alert in result.alerts]
                 logger.info(
                     "Checked=%s failed=%s new_alerts=%s",
                     len(results),
                     failed,
-                    sum(len(result.alerts) for result in results),
+                    len(new_alerts),
                 )
             finally:
                 store.close()
-            commit_payload = {
+
+            state_bytes = database.read_bytes()
+            if len(state_bytes) > MAX_STATE_BYTES:
+                raise ValueError("SQLite state exceeds maximum supported size")
+            payload: dict[str, str] = {
                 "message": "chore(state): persist monitored prices",
-                "content": base64.b64encode(db_path.read_bytes()).decode("ascii"),
+                "content": base64.b64encode(state_bytes).decode("ascii"),
                 "branch": branch,
             }
             if previous_sha:
-                commit_payload["sha"] = previous_sha
-            # The remote content SHA provides optimistic concurrency protection.
-            _api(client, "PUT", state_url, json=commit_payload)
-            logger.info("State safely persisted in designated private repository")
+                payload["sha"] = previous_sha
+            # A failed PUT (including conflict) MUST prevent outgoing SMTP alerts.
+            _api(client, "PUT", f"/repos/{repository}/contents/{STATE_PATH}", json=payload)
+            logger.info("SQLite state committed to the separate private repository")
+
+            # State and alert deduplication records are durable before SMTP starts.
+            if new_alerts:
+                try:
+                    send_email(new_alerts)
+                except (OSError, ValueError, smtplib.SMTPException) as exc:
+                    logger.error("SMTP delivery failed after state commit: %s", type(exc).__name__)
+                    return 1
             return 1 if failed else 0
 
 

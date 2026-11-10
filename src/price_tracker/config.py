@@ -15,6 +15,8 @@ class Settings(BaseModel):
     retry_delay_seconds: float = Field(default=0.5, ge=0, le=30)
     between_products_seconds: float = Field(default=1, ge=0, le=60)
     max_products_per_run: int = Field(default=50, ge=1, le=500)
+    allowed_hosts: frozenset[str] | None = None
+    require_https: bool = False
 
     @field_validator("database_path")
     @classmethod

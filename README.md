@@ -8,15 +8,25 @@
 
 [![CI](https://github.com/RamonRDR/price-tracker-automation/actions/workflows/ci.yml/badge.svg)](https://github.com/RamonRDR/price-tracker-automation/actions/workflows/ci.yml)
 [![Python 3.14](https://img.shields.io/badge/Python-3.14-blue)](https://www.python.org/)
-[![Playwright](https://img.shields.io/badge/Playwright-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev/python/)
-[![httpx](https://img.shields.io/badge/httpx-HTTP-4C78A8)](https://www.python-httpx.org/)
-[![SQLite](https://img.shields.io/badge/SQLite-history-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
-[![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-ORM-D71F00)](https://www.sqlalchemy.org/)
-[![pytest](https://img.shields.io/badge/pytest-tested-0A9EDC?logo=pytest&logoColor=white)](https://docs.pytest.org/)
-[![Ruff](https://img.shields.io/badge/Ruff-lint%20%26%20format-555555)](https://docs.astral.sh/ruff/)
 [![MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
+[![Pydantic v2](https://img.shields.io/badge/Pydantic-v2-E92063)](https://docs.pydantic.dev/latest/)
+[![Playwright](https://img.shields.io/badge/Playwright-Chromium-2EAD33)](https://playwright.dev/python/)
+[![httpx](https://img.shields.io/badge/httpx-HTTP-4C78A8)](https://www.python-httpx.org/)
+[![SQLite](https://img.shields.io/badge/SQLite-history-003B57)](https://www.sqlite.org/)
+[![SQLAlchemy 2](https://img.shields.io/badge/SQLAlchemy-2-D71F00)](https://www.sqlalchemy.org/)
+[![Typer](https://img.shields.io/badge/Typer-CLI-007C6C)](https://typer.tiangolo.com/)
+[![Rich](https://img.shields.io/badge/Rich-terminal-6C63FF)](https://rich.readthedocs.io/en/stable/)
+[![hatchling](https://img.shields.io/badge/hatchling-packaging-663399)](https://hatch.pypa.io/latest/)
+
+[![pytest](https://img.shields.io/badge/pytest-62%20passing-0A9EDC)](https://github.com/RamonRDR/price-tracker-automation/actions/runs/42732629484)
+[![Chromium tests](https://img.shields.io/badge/Chromium-5%20passing-4A90E2)](https://github.com/RamonRDR/price-tracker-automation/actions/runs/42732629484)
+[![Ruff](https://img.shields.io/badge/Ruff-lint%20%26%20format-D7FF64)](https://docs.astral.sh/ruff/)
+[![Build](https://img.shields.io/badge/Build-wheel%20%2B%20sdist-passing-555555)](https://github.com/RamonRDR/price-tracker-automation/actions/runs/42732629484)
+
 </div>
+
+> **Project status:** Core MVP integrated into `main` after the resolved Codex review in [PR #1](https://github.com/RamonRDR/price-tracker-automation/pull/1). The CI run used for the test badge passed **57 unit/local HTTP tests + 5 controlled Chromium tests = 62 passing**. External scheduled monitoring remains disabled; optional SMTP delivery is not validated against a live mail server by CI.
 
 A responsible, testable price-tracking CLI built with Python 3.14, Playwright, HTTP adapters, and SQLite. Designed as a practical portfolio project for **Python, Backend, Automation, and QA Automation** roles.
 
@@ -48,6 +58,8 @@ Price Tracker Automation registers a product URL, extracts its name and current 
 | Notifications | Python SMTP with STARTTLS (optional) |
 | Testing and quality | pytest, pytest-playwright, Ruff |
 | Packaging and CI | hatchling, Python build, GitHub Actions |
+
+**Version accuracy:** Python 3.14 is used by CI; Pydantic is declared as `>=2.12,<3` and SQLAlchemy as `>=2.0.40,<3`, so the badges identify their **major versions**, not an invented exact installation. Other dependencies are constrained by ranges in `pyproject.toml`.
 
 ## 3. Architecture
 
@@ -91,7 +103,7 @@ python -m playwright install chromium
 price-tracker --help
 ~~~
 
-**While PR #1 is unmerged**, switch to `feat/price-tracker-complete-mvp` after cloning: the implementation is not on `main` yet.
+The application code is already on `main` ([PR #1](https://github.com/RamonRDR/price-tracker-automation/pull/1)); no feature branch checkout is needed.
 
 ## 5. Quick start: an actual, controlled local demo
 
@@ -190,6 +202,10 @@ Every successful check stores a timestamped price observation. `history` display
 
 ## 10. Tests and code quality
 
+**Verified test results:** [GitHub Actions run #42732629484](https://github.com/RamonRDR/price-tracker-automation/actions/runs/42732629484) reported **57 passed, 5 deselected** for `pytest -m "not browser"` and **5 passed, 57 deselected** for `pytest -m browser`. Across both non-overlapping suites, **62 passed, 0 failed, 0 skipped**; the deselections are tests handled in the other job, not skipped tests. Ruff lint/format and wheel/sdist builds also passed.
+
+**Badge maintenance:** the `pytest | 62 passing` badge is a **static snapshot of that successful run**, not a live test counter. When tests change, check both CI jobs on the new commit and update the badge count only after a new green run. No workflow auto-commits badge changes to `main`.
+
 ~~~bash
 python -m pytest -q -m "not browser"
 python -m playwright install chromium
@@ -225,6 +241,27 @@ The runner refuses public state repositories and unapproved hosts, uses one boun
 - Persistent GitHub Actions monitoring requires a separately provisioned private state repository and explicit authorization.
 - This project never provides CAPTCHA bypass, authentication handling, stealth automation, or workarounds for blocked sources.
 
-## 13. License
+## 13. Repository structure
+
+~~~text
+price-tracker-automation/
+├── .github/workflows/        # CI and approval-gated manual monitoring
+├── docs/adr/                 # Monitoring and permissions decision
+├── examples/                 # Fictional product configuration
+├── src/price_tracker/        # CLI, adapters, database, alerts, runner
+├── tests/                    # Unit, loopback HTTP, Chromium integration
+├── .env.example              # Environment variable examples
+├── pyproject.toml            # Python dependencies and build configuration
+├── README.md                 # Primary English guide
+├── README.pt-BR.md           # Brazilian Portuguese guide
+├── README.es.md              # Spanish guide
+└── LICENSE                   # MIT
+~~~
+
+## 14. Contributing
+
+To propose a change, work on a feature branch and open a pull request. Run the tests and Ruff checks in [section 10](#10-tests-and-code-quality) before submitting. Keep fixtures fictional or local, never commit credentials or personal price data, and do not enable automated external monitoring without the source owner's explicit approval.
+
+## 15. License
 
 Licensed under the [MIT License](LICENSE). Example sources and products are fictional unless explicitly identified as local fixtures.

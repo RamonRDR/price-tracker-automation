@@ -155,10 +155,10 @@ class Store:
                 .order_by(PriceObservation.id.desc())
                 .limit(1)
             )
-            if product.currency is not None and product.currency != quote.currency:
-                raise InvalidProduct("Quote currency differs from the configured product currency")
             if previous and previous.currency != quote.currency:
                 raise InvalidProduct("Currency changed; refusing to compare unlike values")
+            if product.currency is not None and product.currency != quote.currency:
+                raise InvalidProduct("Quote currency differs from the configured product currency")
             observation = PriceObservation(
                 product_id=product_id,
                 name=quote.name.strip(),

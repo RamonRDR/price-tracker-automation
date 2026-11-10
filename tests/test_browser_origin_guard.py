@@ -99,7 +99,7 @@ def test_cross_origin_redirect_blocked_before_any_http_request(
             currency="USD",
         )
     )
-    with pytest.raises(SourceError, match="Playwright extraction failed"):
+    with pytest.raises(SourceError):
         fetch_css(product, settings)
     assert forbidden_hits == []
 

@@ -162,11 +162,23 @@ def fetch_css(product: Product, settings: Settings) -> PriceQuote:
                 context = browser.new_context(service_workers="block")
 
                 def guard(route) -> None:
-                    if source_is_approved(route.request.url, product, settings):
-                        route.continue_()
-                    else:
+                    if not source_is_approved(route.request.url, product, settings):
                         logger.warning("Blocked browser request outside approved origins")
                         route.abort("blockedbyclient")
+                        return
+                    try:
+                        # route.continue_() can follow redirects without re-interception.
+                        # fetch(max_redirects=0) stops at the FIRST response instead.
+                        upstream = route.fetch(
+                            max_redirects=0, timeout=int(settings.timeout_seconds * 1000)
+                        )
+                        if 300 <= upstream.status < 400:
+                            logger.warning("Blocked browser redirect before next destination")
+                            route.abort("blockedbyclient")
+                        else:
+                            route.fulfill(response=upstream)
+                    except PlaywrightError:
+                        route.abort("failed")
 
                 context.route("**/*", guard)
                 context.route_web_socket("**/*", lambda websocket: websocket.close())

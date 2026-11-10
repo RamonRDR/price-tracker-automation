@@ -61,7 +61,7 @@ def guarded_servers() -> Iterator[tuple[str, list[str]]]:
                 body = (
                     "<!doctype html><html><body>"
                     '<h1 id="name">Safe demo</h1><div id="price">20.00</div>'
-                f'<script>fetch("{foreign_url}").catch(() => {{}});</script>'
+                    f'<script>fetch("{foreign_url}").catch(() => {{}});</script>'
                     "</body></html>"
                 ).encode()
             self.send_response(200)

@@ -84,7 +84,9 @@ class FakeGitHubClient:
                 assert payload["sha"] == _blob_sha(self.state)
             self.saved = base64.b64decode(payload["content"])
             self.state = self.saved
-            return httpx.Response(200, json={"content": {"sha": _blob_sha(self.saved)}}, request=request)
+            return httpx.Response(
+                200, json={"content": {"sha": _blob_sha(self.saved)}}, request=request
+            )
         raise AssertionError(f"Unexpected simulated GitHub request: {method} {path}")
 
     def get(self, url: str, **kwargs) -> httpx.Response:
